@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
   echo = TRUE,
   warning = FALSE,
   fig.width = 8,
-  fig.asp = 6,
+  fig.asp = .6,
   out.width = "90%"
 )
 
@@ -45,5 +45,178 @@ weather_df =
     month = lubridate::floor_date(date, unit = "month")) %>%
   select(name, id, date, month, everything())
 ```
+
+## `group_by` and counting
+
+```{r}
+weather_df %>%
+  group_by(name, month)
+```
+
+```{r}
+weather_df %>%
+  group_by(name) %>% 
+  summarize(n_obs = n())
+```
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>% 
+  summarize(n_obs = n())
+```
+
+```{r}
+weather_df %>%
+  group_by(month) %>% 
+  summarize(
+    n_obs = n(),
+    n_unique = n_distinct(date)) 
+```
+
+```{r}
+weather_df %>%
+  count(name, month)
+```
+
+```{r, eval= FALSE}
+## don't ever do this
+
+weather_df %>%
+  pull(name) %>% 
+  table()
+```
+
+(let's make a nice table)
+
+```{r}
+weather_df %>%
+  count(name) %>%
+  knitr::kable()
+```
+
+## (2x2 tables)
+
+a digression .. 
+
+```{r}
+weather_df %>% 
+  filter(name != "Waikiki_HA") %>% 
+  mutate(
+    cold = case_when(
+      tmax <  5 ~ "cold",
+      tmax >= 5 ~ "not cold",
+      TRUE      ~ ""
+    )
+  ) %>% 
+  group_by(name, cold) %>% 
+  count() %>% 
+  pivot_wider(
+    names_from = cold,
+    values_from = n)
+```
+
+
+```{r}
+weather_df %>% 
+  filter(name != "Waikiki_HA") %>% 
+  mutate(
+    cold = case_when(
+      tmax <  5 ~ "cold",
+      tmax >= 5 ~ "not cold",
+      TRUE      ~ ""
+    )
+  ) %>% 
+  janitor::tabyl(name, cold)
+```
+
+## general summaries
+
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  summarize(
+    n = n(),
+    mean_tmax = mean(tmax, na.rm = TRUE),
+    sd_tmax = sd(tmax, na.rm = TRUE),
+    median_prec = median(prcp, na.rm = TRUE),
+  )
+```
+
+```{r, eval = FALSE}
+weather_df %>% 
+  filter(is.na(tmax))
+```
+
+```{r}
+weather_df %>% 
+  group_by(name, month) %>% 
+  summarize(
+    n = n(),
+    mean_tmax = mean(tmax, na.rm = TRUE),
+    sd_tmax = sd(tmax, na.rm = TRUE),
+    median_prec = median(prcp, na.rm = TRUE),
+  ) %>% 
+  ggplot(aes(x = month, y = mean_tmax, color = name)) +
+  geom_point() + geom_line()
+```
+
+```{r}
+weather_df %>% 
+  group_by(name, month) %>% 
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) %>% 
+  pivot_wider(
+    names_from = name,
+    values_from = mean_tmax
+  ) %>% 
+  knitr::kable(digits = 1)
+```
+
+
+## grouped mutates
+
+(don't forget you can ungroup ...)
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  ungroup
+```
+
+```{r}
+weather_df %>% 
+  group_by(name) %>% 
+  mutate(
+    mean_tmax = mean(tmax, na.rm = TRUE),
+    centered_tmax = tmax - mean_tmax
+  ) %>% 
+  ggplot(aes(x = date, y = centered_tmax, color = name)) +
+  geom_point()
+```
+
+window functions in grouped mutates ...
+
+```{r}
+weather_df %>%
+  group_by(name, month) %>%
+  mutate(tmax_ranking = min_rank(tmax)) %>% 
+  filter(tmax_ranking == 1)
+```
+
+lags and leads ...
+
+```{r}
+weather_df %>%
+  group_by(name) %>% 
+  mutate(
+    lagged_tmax = lag(tmax),
+    one_day_tmax_change = tmax - lagged_tmax
+  ) %>% 
+  summarize(sd_daily_change = sd(one_day_tmax_change, na.rm = TRUE))
+```
+
+`summarize` can give a result very fast!
+
+
 
 
